@@ -1,0 +1,443 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum AccountStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum District {
+  DEVELOPER
+  CREATOR
+  GAMING
+  MUSIC
+  SPORTS
+  TRENDING
+  NEWCOMER
+}
+
+enum BuildingStyle {
+  SHOP
+  HOUSE
+  APARTMENT
+  STUDIO
+  TOWER
+  SKYSCRAPER
+}
+
+enum BuildingTheme {
+  MIDNIGHT
+  AURORA
+  SUNSET
+  FOREST
+  OCEAN
+  NEON
+}
+
+enum FriendRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+}
+
+enum NotificationType {
+  FOLLOW
+  FRIEND_REQUEST
+  FRIEND_ACCEPTED
+  BUILDING_VISIT
+  ACHIEVEMENT
+  BUILDING_UPGRADE
+  WORLD_EVENT
+  SYSTEM
+}
+
+enum EventStatus {
+  DRAFT
+  SCHEDULED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum WeatherType {
+  CLEAR
+  CLOUDY
+  RAIN
+  FOG
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum ReportReason {
+  SPAM
+  HARASSMENT
+  IMPERSONATION
+  INAPPROPRIATE_CONTENT
+  OTHER
+}
+
+enum SocialProvider {
+  GITHUB
+  YOUTUBE
+  TWITCH
+  SPOTIFY
+  INSTAGRAM
+}
+
+model User {
+  id              String        @id @default(uuid()) @db.Uuid
+  email           String        @unique @db.VarChar(320)
+  username        String        @unique @db.VarChar(32)
+  passwordHash    String        @db.VarChar(255)
+  role            UserRole      @default(USER)
+  status          AccountStatus @default(ACTIVE)
+  emailVerifiedAt DateTime?
+  lastActiveAt    DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  profile              Profile?
+  privacy              PrivacySettings?
+  building             Building?
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  socialAccounts       SocialAccount[]
+  posts                Post[]
+  followsGiven         Follow[]             @relation("FollowFollower")
+  followsReceived      Follow[]             @relation("FollowFollowing")
+  friendRequestsSent   FriendRequest[]      @relation("FriendRequestSender")
+  friendRequestsReceived FriendRequest[]    @relation("FriendRequestReceiver")
+  friendshipsA         Friendship[]         @relation("FriendshipA")
+  friendshipsB         Friendship[]         @relation("FriendshipB")
+  notifications        Notification[]       @relation("NotificationRecipient")
+  notificationActions  Notification[]       @relation("NotificationActor")
+  achievements         UserAchievement[]
+  favorites            Favorite[]
+  buildingVisits       BuildingVisit[]      @relation("BuildingVisitor")
+  districtVisits       UserDistrictVisit[]
+  trendingSnapshots    TrendingSnapshot[]
+  eventsCreated        WorldEvent[]         @relation("EventCreator")
+  reportsFiled         Report[]             @relation("ReportAuthor")
+  reportsReceived      Report[]             @relation("ReportSubject")
+  reportsResolved      Report[]             @relation("ReportResolver")
+
+  @@index([createdAt])
+  @@index([lastActiveAt])
+  @@index([status, role])
+}
+
+model Profile {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid
+  displayName   String   @db.VarChar(80)
+  bio           String   @default("") @db.VarChar(500)
+  avatarUrl     String?  @db.VarChar(2048)
+  interests     String[] @default([])
+  district      District @default(NEWCOMER)
+  profileViews  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([displayName])
+  @@index([district, createdAt])
+}
+
+model PrivacySettings {
+  id                      String   @id @default(uuid()) @db.Uuid
+  userId                  String   @unique @db.Uuid
+  showOnlineStatus        Boolean  @default(true)
+  showLastSeen            Boolean  @default(true)
+  allowBuildingVisits     Boolean  @default(true)
+  showFollowerInformation Boolean  @default(true)
+  allowFriendRequests     Boolean  @default(true)
+  updatedAt               DateTime @updatedAt
+  user                    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Building {
+  id            String        @id @default(uuid()) @db.Uuid
+  userId        String        @unique @db.Uuid
+  district      District
+  x             Float
+  z             Float
+  chunkX        Int
+  chunkZ        Int
+  level         Int           @default(1)
+  style         BuildingStyle @default(HOUSE)
+  visitCount    Int           @default(0)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  customization BuildingCustomization?
+  visits        BuildingVisit[]
+  favorites     Favorite[]
+
+  @@unique([x, z])
+  @@index([chunkX, chunkZ])
+  @@index([district, level])
+}
+
+model BuildingCustomization {
+  id               String        @id @default(uuid()) @db.Uuid
+  buildingId       String        @unique @db.Uuid
+  theme            BuildingTheme @default(MIDNIGHT)
+  facadeAsset      String        @default("facade-01") @db.VarChar(64)
+  windowAsset      String        @default("window-01") @db.VarChar(64)
+  signAsset        String        @default("sign-01") @db.VarChar(64)
+  roofAsset        String        @default("roof-01") @db.VarChar(64)
+  billboardText    String?       @db.VarChar(80)
+  billboardImageUrl String?      @db.VarChar(2048)
+  updatedAt        DateTime      @updatedAt
+  building         Building      @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+}
+
+model Post {
+  id        String   @id @default(uuid()) @db.Uuid
+  authorId  String   @db.Uuid
+  caption   String   @default("") @db.VarChar(1000)
+  mediaUrl  String   @db.VarChar(2048)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId, createdAt(sort: Desc)])
+}
+
+model Follow {
+  followerId  String   @db.Uuid
+  followingId String   @db.Uuid
+  createdAt   DateTime @default(now())
+  follower    User     @relation("FollowFollower", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("FollowFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@index([followingId, createdAt(sort: Desc)])
+  @@index([followerId, createdAt(sort: Desc)])
+}
+
+model FriendRequest {
+  id         String              @id @default(uuid()) @db.Uuid
+  senderId   String              @db.Uuid
+  receiverId String              @db.Uuid
+  status     FriendRequestStatus @default(PENDING)
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+  sender     User                @relation("FriendRequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver   User                @relation("FriendRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([receiverId, status, createdAt(sort: Desc)])
+}
+
+model Friendship {
+  id        String   @id @default(uuid()) @db.Uuid
+  userAId   String   @db.Uuid
+  userBId   String   @db.Uuid
+  createdAt DateTime @default(now())
+  userA     User     @relation("FriendshipA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User     @relation("FriendshipB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+}
+
+model Notification {
+  id          String           @id @default(uuid()) @db.Uuid
+  recipientId String           @db.Uuid
+  actorId     String?          @db.Uuid
+  type        NotificationType
+  title       String           @db.VarChar(120)
+  body        String           @db.VarChar(500)
+  data        Json?
+  readAt      DateTime?
+  createdAt   DateTime         @default(now())
+  recipient   User             @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor       User?            @relation("NotificationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([recipientId, readAt, createdAt(sort: Desc)])
+}
+
+model Achievement {
+  id          String   @id @default(uuid()) @db.Uuid
+  slug        String   @unique @db.VarChar(64)
+  name        String   @db.VarChar(80)
+  description String   @db.VarChar(300)
+  iconAsset   String   @db.VarChar(128)
+  points      Int      @default(10)
+  createdAt   DateTime @default(now())
+  users       UserAchievement[]
+}
+
+model UserAchievement {
+  userId        String      @db.Uuid
+  achievementId String      @db.Uuid
+  unlockedAt    DateTime    @default(now())
+  progress      Int         @default(100)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+  @@index([userId, unlockedAt(sort: Desc)])
+}
+
+model BuildingVisit {
+  id         String   @id @default(uuid()) @db.Uuid
+  buildingId String   @db.Uuid
+  visitorId  String?  @db.Uuid
+  visitedAt  DateTime @default(now())
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+  visitor    User?    @relation("BuildingVisitor", fields: [visitorId], references: [id], onDelete: SetNull)
+
+  @@index([buildingId, visitedAt(sort: Desc)])
+  @@index([visitorId, visitedAt(sort: Desc)])
+}
+
+model Favorite {
+  userId     String   @db.Uuid
+  buildingId String   @db.Uuid
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  building   Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  @@id([userId, buildingId])
+  @@index([buildingId])
+}
+
+model RefreshToken {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  tokenHash  String    @unique @db.Char(64)
+  familyId   String    @db.Uuid
+  expiresAt  DateTime
+  revokedAt  DateTime?
+  replacedBy String?   @db.Uuid
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, familyId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  tokenHash String    @unique @db.Char(64)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model SocialAccount {
+  id                String         @id @default(uuid()) @db.Uuid
+  userId            String         @db.Uuid
+  provider          SocialProvider
+  providerAccountId String         @db.VarChar(255)
+  displayHandle     String?        @db.VarChar(100)
+  metadata          Json?
+  accessTokenCipher String?        @db.Text
+  refreshTokenCipher String?       @db.Text
+  tokenExpiresAt    DateTime?
+  scopes            String[]       @default([])
+  lastSyncedAt      DateTime?
+  connectedAt       DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@unique([userId, provider])
+}
+
+model UserDistrictVisit {
+  userId      String   @db.Uuid
+  district    District
+  firstSeenAt DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, district])
+}
+
+model TrendingSnapshot {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @db.Uuid
+  score           Float
+  followerGrowth  Int      @default(0)
+  profileVisits   Int      @default(0)
+  interactions    Int      @default(0)
+  activityScore   Float    @default(0)
+  windowStartedAt DateTime
+  calculatedAt    DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, windowStartedAt])
+  @@index([calculatedAt, score(sort: Desc)])
+}
+
+model WorldEvent {
+  id          String      @id @default(uuid()) @db.Uuid
+  slug        String      @unique @db.VarChar(80)
+  name        String      @db.VarChar(120)
+  description String      @db.VarChar(1000)
+  district    District?
+  status      EventStatus @default(DRAFT)
+  startsAt    DateTime
+  endsAt      DateTime
+  decorations Json?
+  createdById String?     @db.Uuid
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdBy   User?       @relation("EventCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([status, startsAt, endsAt])
+}
+
+model WorldState {
+  id          String      @id @default("primary") @db.VarChar(32)
+  timeScale   Float       @default(1)
+  timeOffset  Float       @default(0)
+  weather     WeatherType @default(CLEAR)
+  weatherSeed Int         @default(1)
+  updatedAt   DateTime    @updatedAt
+}
+
+model Report {
+  id           String       @id @default(uuid()) @db.Uuid
+  authorId     String       @db.Uuid
+  subjectId    String       @db.Uuid
+  resolverId   String?      @db.Uuid
+  reason       ReportReason
+  detail       String       @default("") @db.VarChar(1000)
+  status       ReportStatus @default(OPEN)
+  resolution   String?      @db.VarChar(1000)
+  createdAt    DateTime     @default(now())
+  resolvedAt   DateTime?
+  author       User         @relation("ReportAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  subject      User         @relation("ReportSubject", fields: [subjectId], references: [id], onDelete: Cascade)
+  resolver     User?        @relation("ReportResolver", fields: [resolverId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([subjectId, status])
+}

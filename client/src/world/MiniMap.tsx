@@ -1,0 +1,3 @@
+import type { WorldBuilding } from "./types";
+import { useWorldStore } from "./worldStore";
+export function MiniMap({buildings}:{buildings:WorldBuilding[]}){const player=useWorldStore((s)=>s.player);const selected=useWorldStore((s)=>s.selected);return <div className="minimap" aria-label="Sir MVIT campus mini map"><div className="minimap-grid"/>{buildings.slice(0,80).map((b)=><i key={b.id} className={selected?.id===b.id?"selected":b.online?"online":""} style={{left:`${50+b.x/6}%`,top:`${50+b.z/6}%`}}/>)}<b style={{left:`${50+player.x/6}%`,top:`${50+player.z/6}%`}}/><span>Sir MVIT · 13.15135, 77.60904</span></div>}

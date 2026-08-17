@@ -1,0 +1,43 @@
+import cors from "cors";
+import cookieParser from "cookie-parser";
+import express from "express";
+import rateLimit from "express-rate-limit";
+import helmet from "helmet";
+import { pinoHttp } from "pino-http";
+import { env } from "./config/env.js";
+import { logger } from "./config/logger.js";
+import { errorHandler, notFound } from "./middleware/error-handler.js";
+import { healthRouter } from "./routes/health.routes.js";
+import { authRouter } from "./modules/auth/auth.routes.js";
+import { usersRouter } from "./modules/users/users.routes.js";
+import { socialRouter } from "./modules/social/social.routes.js";
+import { worldRouter } from "./modules/world/world.routes.js";
+import { discoveryRouter } from "./modules/discovery/discovery.routes.js";
+import { platformRouter } from "./modules/platform/platform.routes.js";
+import { adminRouter } from "./modules/admin/admin.routes.js";
+import { integrationsRouter } from "./modules/integrations/integrations.routes.js";
+
+export function createApp() {
+  const app = express();
+  app.disable("x-powered-by");
+  app.set("trust proxy", 1);
+  app.use(pinoHttp({ logger }));
+  app.use(helmet());
+  app.use(cors({ origin: env.CLIENT_ORIGIN, credentials: true, methods: ["GET", "POST", "PUT", "PATCH", "DELETE"] }));
+  app.use(express.json({ limit: "100kb" }));
+  app.use(express.urlencoded({ extended: false, limit: "100kb" }));
+  app.use(cookieParser());
+  app.use("/api", rateLimit({ windowMs: 60_000, limit: 120, standardHeaders: "draft-8", legacyHeaders: false }));
+  app.use("/api", healthRouter);
+  app.use("/api/auth", authRouter);
+  app.use("/api/users", usersRouter);
+  app.use("/api", socialRouter);
+  app.use("/api", worldRouter);
+  app.use("/api", discoveryRouter);
+  app.use("/api", platformRouter);
+  app.use("/api/admin", adminRouter);
+  app.use("/api/integrations", integrationsRouter);
+  app.use(notFound);
+  app.use(errorHandler);
+  return app;
+}
