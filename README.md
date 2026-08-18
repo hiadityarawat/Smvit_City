@@ -271,5 +271,5 @@ The test suite covers authentication primitives, API validation and errors, auth
 - [Current implementation status](docs/STATUS.md)
 
 ## License
-
+hello
 No open-source license has been selected yet. Until a license is added, all rights remain with the repository owner.
