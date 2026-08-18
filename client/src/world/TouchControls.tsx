@@ -1,0 +1,3 @@
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp } from "lucide-react";
+import { useWorldStore } from "./worldStore";
+export function TouchControls(){const set=useWorldStore((s)=>s.setInput);const bind=(key:"forward"|"back"|"left"|"right")=>({onPointerDown:()=>set(key,true),onPointerUp:()=>set(key,false),onPointerCancel:()=>set(key,false),onPointerLeave:()=>set(key,false)});return <div className="touch-controls" aria-label="Movement controls"><button aria-label="Move forward" {...bind("forward")}><ArrowUp/></button><button aria-label="Move left" {...bind("left")}><ArrowLeft/></button><button aria-label="Move backward" {...bind("back")}><ArrowDown/></button><button aria-label="Move right" {...bind("right")}><ArrowRight/></button></div>}

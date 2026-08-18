@@ -1,0 +1,12 @@
+import { Router } from "express";
+import { z } from "zod";
+import { requireAuth,requireRole } from "../../middleware/auth.js";
+import { validateBody } from "../../middleware/validate.js";
+import { validatePart } from "../../middleware/validate-request.js";
+import { prisma } from "../../database/prisma.js";
+export const adminRouter=Router();adminRouter.use(requireAuth,requireRole("ADMIN","MODERATOR"));const id=z.object({id:z.uuid()});
+adminRouter.get("/stats",async(_req,res)=>{const [users,buildings,follows,reports,events]=await prisma.$transaction([prisma.user.count({where:{status:"ACTIVE"}}),prisma.building.count(),prisma.follow.count(),prisma.report.count({where:{status:"OPEN"}}),prisma.worldEvent.count({where:{status:{in:["SCHEDULED","ACTIVE"]}}})]);res.json({data:{users,buildings,follows,openReports:reports,activeEvents:events}});});
+adminRouter.get("/users",async(req,res)=>{const q=typeof req.query.q==="string"?req.query.q:"";res.json({data:await prisma.user.findMany({where:q?{OR:[{username:{contains:q,mode:"insensitive"}},{email:{contains:q,mode:"insensitive"}}]}:{},select:{id:true,email:true,username:true,role:true,status:true,createdAt:true,lastActiveAt:true},orderBy:{createdAt:"desc"},take:100})});});
+adminRouter.patch("/users/:id/status",validatePart("params",id),validateBody(z.object({status:z.enum(["ACTIVE","SUSPENDED"])}).strict()),async(req,res)=>{res.json({data:await prisma.user.update({where:{id:String(req.params.id)},data:{status:req.body.status},select:{id:true,status:true}})});});
+adminRouter.get("/reports",async(_req,res)=>{res.json({data:await prisma.report.findMany({include:{author:true,subject:true},orderBy:{createdAt:"asc"},take:100})});});
+adminRouter.post("/world-events",validateBody(z.object({slug:z.string().min(3).max(80),name:z.string().min(3).max(120),description:z.string().max(1000),startsAt:z.coerce.date(),endsAt:z.coerce.date(),district:z.enum(["DEVELOPER","CREATOR","GAMING","MUSIC","SPORTS","TRENDING","NEWCOMER"]).optional()}).strict()),async(req,res)=>{res.status(201).json({data:await prisma.worldEvent.create({data:{...req.body,status:"SCHEDULED",createdById:req.auth!.sub}})});});

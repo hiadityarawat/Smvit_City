@@ -1,0 +1,6 @@
+import { prisma } from "../../database/prisma.js";
+
+export const discoveryService = {
+  async trending() { const latest = await prisma.trendingSnapshot.findMany({ orderBy: [{ calculatedAt: "desc" }, { score: "desc" }], take: 30, include: { user: { include: { profile: true, building: true } } } }); const byUser = new Map<string, typeof latest[number]>(); for (const row of latest) if (!byUser.has(row.userId)) byUser.set(row.userId, row); return [...byUser.values()].slice(0, 20).map((row) => ({ userId: row.userId, username: row.user.username, displayName: row.user.profile!.displayName, avatarUrl: row.user.profile!.avatarUrl, buildingId: row.user.building!.id, score: row.score, signals: { followerGrowth: row.followerGrowth, profileVisits: row.profileVisits, interactions: row.interactions, activity: row.activityScore } })); },
+  async leaderboard(metric: string) { if (metric === "visits") return prisma.building.findMany({ orderBy: { visitCount: "desc" }, take: 20, include: { user: { include: { profile: true } } } }); return prisma.user.findMany({ where: { status: "ACTIVE" }, orderBy: { followsReceived: { _count: "desc" } }, take: 20, include: { profile: true, building: true, _count: { select: { followsReceived: true } } } }); },
+};

@@ -1,0 +1,7 @@
+import { useEffect } from "react";
+import { io } from "socket.io-client";
+import { useAuthStore } from "../features/auth/authStore";
+import { useWorldStore } from "./worldStore";
+
+type Remote={userId:string;username:string;x:number;y:number;z:number;rotationY:number;movement:string};
+export function useMultiplayer(){const token=useAuthStore((s)=>s.accessToken);useEffect(()=>{if(!token)return;const socket=io(import.meta.env.VITE_SOCKET_URL??"http://localhost:4000",{auth:{token},transports:["websocket"]});const upsert=useWorldStore.getState().upsertRemote;const remove=useWorldStore.getState().removeRemote;socket.on("presence:snapshot",({users}:{users:Array<{userId:string;username:string;position:Remote}>})=>users.forEach((user)=>upsert({...user.position,userId:user.userId,username:user.username})));socket.on("player:joined",(player:Remote)=>upsert(player));socket.on("player:moved",(player:Remote)=>upsert(player));socket.on("player:left",({userId}:{userId:string})=>remove(userId));let sequence=0,last=0;const unsubscribe=useWorldStore.subscribe((state)=>{const now=performance.now();if(now-last<80)return;last=now;sequence+=1;socket.emit("player:move",{...state.player,rotationY:0,movement:state.input.run?"run":state.input.forward||state.input.back||state.input.left||state.input.right?"walk":state.player.y>1.05?"jump":"idle",sequence});});return()=>{unsubscribe();socket.disconnect();};},[token]);}

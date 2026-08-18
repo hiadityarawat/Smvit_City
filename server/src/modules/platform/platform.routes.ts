@@ -1,0 +1,10 @@
+import { Router } from "express";
+import { z } from "zod";
+import { optionalAuth,requireAuth } from "../../middleware/auth.js";
+import { validatePart } from "../../middleware/validate-request.js";
+import { platformService } from "./platform.service.js";
+export const platformRouter=Router();const id=z.object({id:z.uuid()});
+platformRouter.get("/dashboard",requireAuth,async(req,res)=>{res.json({data:await platformService.dashboard(req.auth!.sub)});});
+platformRouter.get("/buildings/:id/interior",optionalAuth,validatePart("params",id),async(req,res)=>{res.json({data:await platformService.interior(String(req.params.id),req.auth?.sub)});});
+platformRouter.get("/achievements",async(_req,res)=>{res.json({data:await platformService.achievements()});});
+platformRouter.get("/users/:id/achievements",validatePart("params",id),async(req,res)=>{res.json({data:await platformService.userAchievements(String(req.params.id))});});

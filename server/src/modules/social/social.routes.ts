@@ -1,0 +1,23 @@
+import { Router } from "express";
+import { z } from "zod";
+import { requireAuth } from "../../middleware/auth.js";
+import { validateBody } from "../../middleware/validate.js";
+import { validatePart } from "../../middleware/validate-request.js";
+import { followsService } from "./follows.service.js";
+import { friendsService } from "./friends.service.js";
+import { notificationsService } from "./notifications.service.js";
+
+const idParam=z.object({id:z.uuid()});const requestParam=z.object({requestId:z.uuid()});
+export const socialRouter=Router();
+socialRouter.post("/users/:id/follow",requireAuth,validatePart("params",idParam),async(req,res)=>{res.status(201).json({data:await followsService.follow(req.auth!.sub,String(req.params.id))});});
+socialRouter.delete("/users/:id/follow",requireAuth,validatePart("params",idParam),async(req,res)=>{res.json({data:await followsService.unfollow(req.auth!.sub,String(req.params.id))});});
+socialRouter.get("/users/:id/followers",requireAuth,validatePart("params",idParam),async(req,res)=>{const data=await followsService.list(String(req.params.id),"followers",req.auth!.sub,typeof req.query.cursor==="string"?req.query.cursor:undefined);res.json({data:data.items,meta:{nextCursor:data.nextCursor}});});
+socialRouter.get("/users/:id/following",requireAuth,validatePart("params",idParam),async(req,res)=>{const data=await followsService.list(String(req.params.id),"following",req.auth!.sub,typeof req.query.cursor==="string"?req.query.cursor:undefined);res.json({data:data.items,meta:{nextCursor:data.nextCursor}});});
+socialRouter.post("/users/:id/friend-requests",requireAuth,validatePart("params",idParam),async(req,res)=>{res.status(201).json({data:await friendsService.request(req.auth!.sub,String(req.params.id))});});
+socialRouter.get("/me/friend-requests",requireAuth,async(req,res)=>{res.json({data:await friendsService.requests(req.auth!.sub)});});
+socialRouter.patch("/friend-requests/:requestId",requireAuth,validatePart("params",requestParam),validateBody(z.object({accept:z.boolean()}).strict()),async(req,res)=>{res.json({data:await friendsService.respond(req.auth!.sub,String(req.params.requestId),req.body.accept)});});
+socialRouter.delete("/friends/:id",requireAuth,validatePart("params",idParam),async(req,res)=>{res.json({data:await friendsService.remove(req.auth!.sub,String(req.params.id))});});
+socialRouter.get("/me/friends",requireAuth,async(req,res)=>{res.json({data:await friendsService.list(req.auth!.sub)});});
+socialRouter.get("/notifications",requireAuth,async(req,res)=>{const result=await notificationsService.list(req.auth!.sub,req.query.unread==="true");res.json({data:result.items,meta:{unread:result.unread}});});
+socialRouter.patch("/notifications/:id/read",requireAuth,validatePart("params",idParam),async(req,res)=>{res.json({data:await notificationsService.read(req.auth!.sub,String(req.params.id))});});
+socialRouter.post("/notifications/read-all",requireAuth,async(req,res)=>{res.json({data:await notificationsService.readAll(req.auth!.sub)});});
